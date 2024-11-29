@@ -40,9 +40,10 @@ jobs:
         OVERRIDE_PATH=$(readlink -f ./tmp/sd)
         STORE_CLI_PATH=$(which store-cli)
 
-        cp -r /opt/sd/* ${OVERRIDE_PATH}/
+        cp -vr /opt/sd/* ${OVERRIDE_PATH}/
         mv ./store-cli ${OVERRIDE_PATH}/
 
+        which store-cli
         export PATH=$(echo $PATH | sed -n "s%\/opt\/sd%${OVERRIDE_PATH}%p")
         which store-cli
     - create-artifacts: &create_outputfile |
