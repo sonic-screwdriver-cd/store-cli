@@ -1,6 +1,7 @@
 cache:
   job:
     artifact_test: [ output_artifact.dat ]
+    artifact_test_before_fixing: [ output_artifact.dat ]
     cache_test: [ output_job_cache.dat ]
     cache_test_with_ExpectHeader: [ output_job_cache.dat ]
 
@@ -47,10 +48,19 @@ jobs:
     - create-artifacts: &create_outputfile |
        dd if=/dev/urandom of=${OUTPUT_FILE_NAME} bs=${DD_CMD_SB} count=${DD_CMD_COUNT}
        ls -lh ./${OUTPUT_FILE_NAME}
-    - copy-artifact-dir: |
+    - copy-artifact-dir: &copy-artifact-dir |
        echo $SD_ARTIFACTS_DIR
        cp ${OUTPUT_FILE_NAME} ${SD_ARTIFACTS_DIR}/${OUTPUT_FILE_NAME}
        echo "copy artifact dir"
+
+  artifact_test_before_fixing:
+    requires: [ ~TEST_HUB ]
+    environment:
+      <<: *artifact-env
+      OUTPUT_FILE_NAME: "output_job_cache.dat"
+    steps:
+    - create-outputfile: *create_outputfile
+    - copy-artifact-dir: *copy-artifact-dir
 
   cache_test:
     requires: [ ~TEST_HUB ]
