@@ -80,3 +80,12 @@ jobs:
       OUTPUT_FILE_NAME: "output_job_cache.dat"
       SD_ENABLE_EXPECT_HEADER: "true"
     steps: *cache-step
+
+  cache_test_with_ExpectHeader_and_long_timeout:
+    requires: [ ~cache_test_with_ExpectHeader ]
+    environment:
+      <<: *artifact-env
+      OUTPUT_FILE_NAME: "output_job_cache.dat"
+      SD_ENABLE_EXPECT_HEADER: "true"
+      CD_EXPECT_CONTINUE_TIMEOUT: 20
+    steps: *cache-step
