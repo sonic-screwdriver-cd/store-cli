@@ -1,31 +1,72 @@
+cache:
+  job:
+    artifact_test: [ output_artifact.dat ]
+    cache_test: [ output_job_cache.dat ]
+    cache_test_with_ExpectHeader: [ output_job_cache.dat ]
+
 shared:
     image: golang:1.19
     environment:
         GO111MODULE: on
 
 jobs:
-    main:
-        environment:
-            SD_SONAR_OPTS:  "-Dsonar.sources=./ -Dsonar.exclusions=**/*_test.go,**/vendor/** -Dsonar.tests=./ -Dsonar.test.inclusions=**/*_test.go -Dsonar.test.exclusions=**/vendor/** -Dsonar.go.coverage.reportPaths=${SD_ARTIFACTS_DIR}/coverage.out -Dsonar.go.tests.reportPaths=${SD_ARTIFACTS_DIR}/report.json"
-        requires: [~commit, ~pr]
-        steps:
-            - vet: go vet ./...
-            - gofmt: ret=$(find . -name '*.go' | xargs gofmt -d) && echo "$ret" && test -z "$ret"
-            - test-setup: go install gotest.tools/gotestsum@latest
-            - test: gotestsum --format testname --jsonfile ${SD_ARTIFACTS_DIR}/report.json -- -coverprofile=${SD_ARTIFACTS_DIR}/coverage.out ./...
-            - build: go build -a -o store-cli
-            - test-release: "curl -sL https://git.io/goreleaser | bash -s -- --snapshot"
+  TEST_HUB:
+    requires: [ ]
+    annotations:
+      screwdriver.cd/virtualJob: true
+    steps:
+      - echo: echo "hello"
 
-    deploy:
-        requires: main
-        steps:
-            - setup-ci: git clone https://github.com/screwdriver-cd/toolbox.git ci
-            - gofmt: ret=$(find . -name '*.go' | xargs gofmt -d) && echo "$ret" && test -z "$ret"
-            - tag: ./ci/git-tag.sh
-            - release: |
-                curl -sL https://git.io/goreleaser | bash
-        secrets:
-            # Pushing tags to Git
-            - GIT_KEY_BASE64
-            # Pushing releases to GitHub
-            - GITHUB_TOKEN
+  artifact_test: &artifact-test
+    environment: &artifact-env
+      SD_DEBUG: "true"
+      SD_ZIP_ARTIFACTS: "false"
+      DD_CMD_SB: "10M"
+      DD_CMD_COUNT: "10"
+      OUTPUT_FILE_NAME: "output-artifact.dat"
+    requires: [ ~TEST_HUB ]
+    steps:
+    - download-store-cli: &download-store-cli |
+       go build -a -o store-cli
+       ls -la store-cli
+       chmod a+x store-cli
+       ./store-cli -h
+    - show-path-check-files: &show-path-check-files |
+        echo $PATH
+        ls -l ./
+    - init-store-cli: &init-store-cli |
+        mkdir -p ./tmp/sd
+        OVERRIDE_PATH=$(readlink -f ./tmp/sd)
+        STORE_CLI_PATH=$(which store-cli)
+
+        cp -r /opt/sd/* ${OVERRIDE_PATH}/
+        mv ./store-cli ${OVERRIDE_PATH}/
+
+        export PATH=$(echo $PATH | sed -n "s%\/opt\/sd%${OVERRIDE_PATH}%p")
+        which store-cli
+    - create-artifacts: &create_outputfile |
+       dd if=/dev/urandom of=${OUTPUT_FILE_NAME} bs=${DD_CMD_SB} count=${DD_CMD_COUNT}
+       ls -lh ./${OUTPUT_FILE_NAME}
+    - copy-artifact-dir: |
+       echo $SD_ARTIFACTS_DIR
+       cp ${OUTPUT_FILE_NAME} ${SD_ARTIFACTS_DIR}/${OUTPUT_FILE_NAME}
+       echo "copy artifact dir"
+
+  cache_test:
+    requires: [ ~TEST_HUB ]
+    environment:
+      <<: *artifact-env
+      OUTPUT_FILE_NAME: "output_job_cache.dat"
+    steps: &cache-step
+    - download-store-cli: *download-store-cli
+    - show-path-check-files: *show-path-check-files
+    - init-store-cli: *init-store-cli
+    - create-outputfile: *create_outputfile
+
+  cache_test_with_ExpectHeader:
+    requires: [ ~TEST_HUB ]
+    environment:
+      <<: *artifact-env
+      OUTPUT_FILE_NAME: "output_job_cache.dat"
+      SD_ENABLE_EXPECT_HEADER: "true"
+    steps: *cache-step
