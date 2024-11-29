@@ -4,6 +4,7 @@ cache:
     artifact_test_before_fixing: [ output_artifact.dat ]
     cache_test: [ output_job_cache.dat ]
     cache_test_with_ExpectHeader: [ output_job_cache.dat ]
+    cache_test_with_ExpectHeader_and_long_timeout: [ output_job_cache.dat ]
 
 shared:
     image: golang:1.19
